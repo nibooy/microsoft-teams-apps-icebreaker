@@ -5,10 +5,10 @@
   "id": "d55d08d9-bacb-4567-942f-afd85d632dcc",
   "packageName": "com.microsoft.teams.icebreaker",
   "developer": {
-    "name": "<company name>",
-    "websiteUrl": "<website url>",
-    "privacyUrl": "<privacy url>",
-    "termsOfUseUrl": "<terms of use url>"
+    "name": "AKS",
+    "websiteUrl": "https://www.microsoft.com",
+    "privacyUrl": "https://www.microsoft.com",
+    "termsOfUseUrl": "https://www.microsoft.com"
   },
   "localizationInfo": {
     "defaultLanguageTag": "en",
@@ -77,7 +77,7 @@
   "accentColor": "#64A2CC",
   "bots": [
     {
-      "botId": "<bot id>",
+      "botId": "05ac6ee4-a156-47af-96f4-9628ed621a01",
       "scopes": [
         "personal",
         "team"
@@ -91,6 +91,6 @@
     "messageTeamMembers"
   ],
   "validDomains": [
-    "<app domain>"
+    "icebreaker-i4ulogahvvmri.azurewebsites.net"
   ]
 }
