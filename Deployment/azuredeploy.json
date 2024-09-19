@@ -14,20 +14,19 @@
             "type": "securestring",
             "minLength": 1,
             "metadata": {
-                "description": "The Microsoft Application Password for the bot."
+                "description": "The Microsoft Application Password for the bot. (client secret)"
             }
         },
         "appName": {
             "type": "string",
             "minLength": 1,
-            "defaultValue": "Icebreaker",
+            "defaultValue": "CoffeeChat",
             "metadata": {
                 "description": "The app name to use for the resources that will be provisioned."
             }
         },
         "tenantId": {
             "type": "string",
-            "defaultValue": "[subscription().tenantId]",
             "minLength": 1,
             "maxLength": 36,
             "metadata": {
@@ -37,7 +36,7 @@
         "appDescription": {
             "type": "string",
             "minLength": 1,
-            "defaultValue": "Icebreaker is a cute little bot that randomly pairs team members up every week to help the team build trust and personal connections.",
+            "defaultValue": "CoffeeChat is a bot that randomly pairs team members up to help the team build trust and personal connections.",
             "metadata": {
                 "description": "The description for the app."
             }
@@ -45,7 +44,7 @@
         "appIconUrl": {
             "type": "string",
             "minLength": 1,
-            "defaultValue": "https://raw.githubusercontent.com/OfficeDev/microsoft-teams-icebreaker-app/main/Manifest/color.png",
+            "defaultValue": "https://raw.githubusercontent.com/nibooy/microsoft-teams-apps-icebreaker/main/Manifest/color.png",
             "metadata": {
                 "description": "The link to the icon for the bot. It must resolve to a PNG file."
             }
@@ -75,7 +74,7 @@
         "pairingWeekInterval": {
             "type": "int",
             "minValue": 1,
-            "defaultValue": 1,
+            "defaultValue": 2,
             "metadata": {
                 "description": "The number of weeks between pairings."
             }
@@ -124,7 +123,7 @@
                 22,
                 23
             ],
-            "defaultValue": 10,
+            "defaultValue": 9,
             "metadata": {
                 "description": "The hour at which pairings are created."
             }
@@ -182,7 +181,7 @@
         "gitRepoUrl": {
             "type": "string",
             "minLength": 1,
-            "defaultValue": "https://github.com/OfficeDev/microsoft-teams-icebreaker-app.git",
+            "defaultValue": "https://github.com/nibooy/microsoft-teams-apps-icebreaker.git",
             "metadata": {
               "description": "The URL to the GitHub repository to deploy."
             }
