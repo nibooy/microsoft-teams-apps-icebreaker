@@ -84,7 +84,7 @@ namespace Icebreaker.Services
 
                 foreach (var team in teams)
                 {
-                    this.telemetryClient.TrackTrace($"Pairing members of team {team.Id}");
+                    this.telemetryClient.TrackTrace($"Pairing members of team {team.TeamId}");
 
                     try
                     {

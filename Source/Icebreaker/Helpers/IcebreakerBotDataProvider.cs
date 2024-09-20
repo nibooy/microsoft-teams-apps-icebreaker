@@ -13,9 +13,9 @@ namespace Icebreaker.Helpers
     using Microsoft.ApplicationInsights;
     using Microsoft.ApplicationInsights.DataContracts;
     using Microsoft.Azure;
-    using Microsoft.Azure.Documents;
-    using Microsoft.Azure.Documents.Client;
-    using Microsoft.Azure.Documents.Linq;
+    using Microsoft.Azure.Cosmos;
+    using Microsoft.Azure.Cosmos.Linq;
+    using Microsoft.Bot.Schema.Teams;
 
     /// <summary>
     /// Data provider routines
@@ -28,10 +28,10 @@ namespace Icebreaker.Helpers
         private readonly TelemetryClient telemetryClient;
         private readonly Lazy<Task> initializeTask;
         private readonly ISecretsHelper secretsHelper;
-        private DocumentClient documentClient;
+        private CosmosClient cosmosClient;
         private Database database;
-        private DocumentCollection teamsCollection;
-        private DocumentCollection usersCollection;
+        private Container teamsCollection;
+        private Container usersCollection;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="IcebreakerBotDataProvider"/> class.
@@ -55,14 +55,21 @@ namespace Icebreaker.Helpers
         {
             await this.EnsureInitializedAsync();
 
-            if (installed)
+            try
             {
-                await this.documentClient.UpsertDocumentAsync(this.teamsCollection.SelfLink, team);
+                if (installed)
+                {
+                    await this.teamsCollection.UpsertItemAsync(team, new PartitionKey(team.TeamId));
+                }
+                else
+                {
+                    await this.teamsCollection.DeleteItemAsync<TeamInstallInfo>(team.TeamId, new PartitionKey(team.TeamId));
+                }
             }
-            else
+            catch (CosmosException ex)
             {
-                var documentUri = UriFactory.CreateDocumentUri(this.database.Id, this.teamsCollection.Id, team.Id);
-                await this.documentClient.DeleteDocumentAsync(documentUri, new RequestOptions { PartitionKey = new PartitionKey(team.Id) });
+                this.telemetryClient.TrackException(ex);
+                // Optionally handle specific status codes, such as NotFound for delete operations
             }
         }
 
@@ -78,21 +85,39 @@ namespace Icebreaker.Helpers
 
             try
             {
-                using (var lookupQuery = this.documentClient
-                    .CreateDocumentQuery<TeamInstallInfo>(this.teamsCollection.SelfLink, new FeedOptions { EnableCrossPartitionQuery = true })
-                    .AsDocumentQuery())
+                var query = this.teamsCollection.GetItemLinqQueryable<TeamInstallInfo>(requestOptions: new QueryRequestOptions
                 {
-                    while (lookupQuery.HasMoreResults)
-                    {
-                        var response = await lookupQuery.ExecuteNextAsync<TeamInstallInfo>();
-                        installedTeams.AddRange(response);
-                    }
+                    MaxItemCount = -1,
+                    MaxConcurrency = -1,
+                }).ToFeedIterator();
+
+                while (query.HasMoreResults)
+                {
+                    var response = await query.ReadNextAsync();
+                    installedTeams.AddRange(response);
                 }
             }
-            catch (Exception ex)
+            catch (CosmosException ex)
             {
-                this.telemetryClient.TrackException(ex.InnerException);
+                this.telemetryClient.TrackException(ex);
             }
+
+            //// approach 2
+            //var installedTeams2 = new List<TeamInstallInfo>();
+
+            //using (FeedIterator<TeamInstallInfo> resultSetIterator = this.teamsCollection.GetItemQueryIterator<
+            //    TeamInstallInfo>(requestOptions: new QueryRequestOptions
+            //    {
+            //        MaxItemCount = -1,
+            //        MaxConcurrency = -1,
+            //    }))
+            //{
+            //    while (resultSetIterator.HasMoreResults)
+            //    {
+            //        var response = await resultSetIterator.ReadNextAsync();
+            //        installedTeams2.AddRange(response);
+            //    }
+            //}
 
             return installedTeams;
         }
@@ -106,15 +131,16 @@ namespace Icebreaker.Helpers
         {
             await this.EnsureInitializedAsync();
 
-            // Get team install info
             try
             {
-                var documentUri = UriFactory.CreateDocumentUri(this.database.Id, this.teamsCollection.Id, teamId);
-                return await this.documentClient.ReadDocumentAsync<TeamInstallInfo>(documentUri, new RequestOptions { PartitionKey = new PartitionKey(teamId) });
+                ItemResponse<TeamInstallInfo> response = await this.teamsCollection.ReadItemAsync<TeamInstallInfo>(
+                    teamId, new PartitionKey(teamId));
+
+                return response.Resource;
             }
-            catch (Exception ex)
+            catch (CosmosException ex)
             {
-                this.telemetryClient.TrackException(ex.InnerException);
+                this.telemetryClient.TrackException(ex);
                 return null;
             }
         }
@@ -130,12 +156,14 @@ namespace Icebreaker.Helpers
 
             try
             {
-                var documentUri = UriFactory.CreateDocumentUri(this.database.Id, this.usersCollection.Id, userId);
-                return await this.documentClient.ReadDocumentAsync<UserInfo>(documentUri, new RequestOptions { PartitionKey = new PartitionKey(userId) });
+                ItemResponse<UserInfo> response = await this.usersCollection.ReadItemAsync<UserInfo>(
+                    userId, new PartitionKey(userId));
+
+                return response.Resource;
             }
-            catch (Exception ex)
+            catch (CosmosException ex)
             {
-                this.telemetryClient.TrackException(ex.InnerException);
+                this.telemetryClient.TrackException(ex);
                 return null;
             }
         }
@@ -148,31 +176,24 @@ namespace Icebreaker.Helpers
         {
             await this.EnsureInitializedAsync();
 
+            var usersOptInStatusLookup = new Dictionary<string, bool>();
             try
             {
-                var collectionLink = UriFactory.CreateDocumentCollectionUri(this.database.Id, this.usersCollection.Id);
-                var query = this.documentClient.CreateDocumentQuery<UserInfo>(
-                        collectionLink,
-                        new FeedOptions
-                        {
-                            EnableCrossPartitionQuery = true,
+                var query = this.usersCollection.GetItemLinqQueryable<UserInfo>(
+                    requestOptions: new QueryRequestOptions
+                    {
+                        MaxItemCount = -1,
+                        MaxConcurrency = -1,
+                    })
+                    .Select(u => new UserInfo { UserId = u.UserId, OptedIn = u.OptedIn })
+                    .ToFeedIterator();
 
-                            // Fetch items in bulk according to DB engine capability
-                            MaxItemCount = -1,
-
-                            // Max partition to query at a time
-                            MaxDegreeOfParallelism = -1,
-                        })
-                    .Select(u => new UserInfo { Id = u.Id, OptedIn = u.OptedIn })
-                    .AsDocumentQuery();
-                var usersOptInStatusLookup = new Dictionary<string, bool>();
                 while (query.HasMoreResults)
                 {
-                    // Note that ExecuteNextAsync can return many records in each call
-                    var responseBatch = await query.ExecuteNextAsync<UserInfo>();
+                    var responseBatch = await query.ReadNextAsync();
                     foreach (var userInfo in responseBatch)
                     {
-                        usersOptInStatusLookup.Add(userInfo.Id, userInfo.OptedIn);
+                        usersOptInStatusLookup.Add(userInfo.UserId, userInfo.OptedIn);
                     }
                 }
 
@@ -204,7 +225,7 @@ namespace Icebreaker.Helpers
                 OptedIn = optedIn,
                 ServiceUrl = serviceUrl,
             };
-            await this.documentClient.UpsertDocumentAsync(this.usersCollection.SelfLink, userInfo);
+            await this.usersCollection.UpsertItemAsync(userInfo);
         }
 
         /// <summary>
@@ -220,24 +241,23 @@ namespace Icebreaker.Helpers
             var teamsCollectionName = CloudConfigurationManager.GetSetting("CosmosCollectionTeams");
             var usersCollectionName = CloudConfigurationManager.GetSetting("CosmosCollectionUsers");
 
-            this.documentClient = new DocumentClient(new Uri(endpointUrl), this.secretsHelper.CosmosDBKey);
+            this.cosmosClient = new CosmosClient(endpointUrl, this.secretsHelper.CosmosDBKey);
 
-            var requestOptions = new RequestOptions { OfferThroughput = DefaultRequestThroughput };
             bool useSharedOffer = true;
 
             // Create the database if needed
             try
             {
-                this.database = await this.documentClient.CreateDatabaseIfNotExistsAsync(new Database { Id = databaseName }, requestOptions);
+                this.database = await this.cosmosClient.CreateDatabaseIfNotExistsAsync(databaseName, DefaultRequestThroughput);
             }
-            catch (DocumentClientException ex)
+            catch (CosmosException ex)
             {
-                if (ex.Error?.Message?.Contains("SharedOffer is Disabled") ?? false)
+                if (ex.Message?.Contains("SharedOffer is Disabled") ?? false)
                 {
                     this.telemetryClient.TrackTrace("Database shared offer is disabled for the account, will provision throughput at container level", SeverityLevel.Information);
                     useSharedOffer = false;
 
-                    this.database = await this.documentClient.CreateDatabaseIfNotExistsAsync(new Database { Id = databaseName });
+                    this.database = await this.cosmosClient.CreateDatabaseIfNotExistsAsync(databaseName);
                 }
                 else
                 {
@@ -246,20 +266,20 @@ namespace Icebreaker.Helpers
             }
 
             // Get a reference to the Teams collection, creating it if needed
-            var teamsCollectionDefinition = new DocumentCollection
+            var teamsCollectionDefinition = new ContainerProperties
             {
                 Id = teamsCollectionName,
+                PartitionKeyPath = "/id",
             };
-            teamsCollectionDefinition.PartitionKey.Paths.Add("/id");
-            this.teamsCollection = await this.documentClient.CreateDocumentCollectionIfNotExistsAsync(this.database.SelfLink, teamsCollectionDefinition, useSharedOffer ? null : requestOptions);
+            this.teamsCollection = await this.cosmosClient.GetDatabase(databaseName).CreateContainerIfNotExistsAsync(teamsCollectionDefinition, useSharedOffer ? -1 : DefaultRequestThroughput);
 
             // Get a reference to the Users collection, creating it if needed
-            var usersCollectionDefinition = new DocumentCollection
+            var usersCollectionDefinition = new ContainerProperties
             {
                 Id = usersCollectionName,
+                PartitionKeyPath = "/id",
             };
-            usersCollectionDefinition.PartitionKey.Paths.Add("/id");
-            this.usersCollection = await this.documentClient.CreateDocumentCollectionIfNotExistsAsync(this.database.SelfLink, usersCollectionDefinition, useSharedOffer ? null : requestOptions);
+            this.usersCollection = await this.cosmosClient.GetDatabase(databaseName).CreateContainerIfNotExistsAsync(usersCollectionDefinition, useSharedOffer ? -1 : DefaultRequestThroughput);
 
             this.telemetryClient.TrackTrace("Data store initialized");
         }

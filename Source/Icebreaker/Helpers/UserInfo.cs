@@ -6,24 +6,18 @@
 namespace Icebreaker.Helpers
 {
     using System.Collections.Generic;
-    using Microsoft.Azure.Documents;
     using Newtonsoft.Json;
 
     /// <summary>
     /// Represents a user
     /// </summary>
-    public class UserInfo : Document
+    public class UserInfo
     {
         /// <summary>
         /// Gets or sets the user's id in Teams (29:xxx).
-        /// This is also the <see cref="Resource.Id"/>.
         /// </summary>
         [JsonIgnore]
-        public string UserId
-        {
-            get { return this.Id; }
-            set { this.Id = value; }
-        }
+        public string UserId { get; set; }
 
         /// <summary>
         /// Gets or sets the tenant id

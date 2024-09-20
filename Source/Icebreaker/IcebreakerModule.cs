@@ -17,7 +17,7 @@ namespace Icebreaker
     using Microsoft.ApplicationInsights.Extensibility;
     using Microsoft.Azure;
     using Microsoft.Bot.Builder;
-    using Microsoft.Bot.Builder.Integration.AspNet.WebApi;
+    using Microsoft.Bot.Builder.Integration.AspNet.Core;
     using Microsoft.Bot.Connector.Authentication;
     using Module = Autofac.Module;
 
@@ -54,7 +54,7 @@ namespace Icebreaker
                     c.Resolve<ISecretsHelper>().MicrosoftAppPassword))
                 .SingleInstance();
 
-            builder.RegisterType<BotFrameworkHttpAdapter>()
+            builder.RegisterType<CloudAdapter>()
                 .As<IBotFrameworkHttpAdapter>()
                 .As<BotAdapter>()
                 .SingleInstance();
