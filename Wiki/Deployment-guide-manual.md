@@ -58,7 +58,7 @@ At this point you have 2 unique values:
 
 1. Click on the "Deploy to Azure" button below.
 
-    [![Deploy to Azure](https://azuredeploy.net/deploybutton.png)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FOfficeDev%2Fmicrosoft-teams-icebreaker-app%2Fmaster%2FDeployment%2Fazuredeploy.json)
+    [![Deploy to Azure](https://azuredeploy.net/deploybutton.png)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fnibooy%2Fmicrosoft-teams-apps-icebreaker%2Fmaster%2FDeployment%2Fazuredeploy.json)
 
 1. When prompted, log in to your Azure subscription.
 

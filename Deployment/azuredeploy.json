@@ -215,7 +215,7 @@
         "appServiceBaseUrl": "[concat('https://', variables('appServiceBaseDomain'))]",
         "botMessagingUrl": "[concat(variables('appServiceBaseUrl'), '/api/messages')]",
         "pairingStartUrl": "[concat(variables('appServiceBaseUrl'), '/api/processnow')]",
-        "pairingFrequency": "Minute",
+        "pairingFrequency": "Week",
         "pairingMinute": 0,
         "manifestAppId": "d55d08d9-bacb-4567-942f-afd85d632dcc"
     },
@@ -439,6 +439,17 @@
                             "recurrence": {
                                 "frequency": "[variables('pairingFrequency')]",
                                 "interval": "[parameters('pairingWeekInterval')]",
+                                "schedule": {
+                                    "hours": [
+                                        "[parameters('pairingHour')]"
+                                    ],
+                                    "minutes": [
+                                        "[variables('pairingMinute')]"
+                                    ],
+                                    "weekDays": [
+                                        "[parameters('pairingDayOfWeek')]"
+                                    ]
+                                },
                                 "timeZone": "[parameters('pairingTimeZone')]"
                             },
                             "type": "Recurrence"
